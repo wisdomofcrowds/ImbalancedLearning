@@ -21,16 +21,24 @@ def computeAUC(c1,c2,y_pred_test,y_test):
         if(reals[i] == c2):
             realsB[i]=1
         if(preds[i] == c2):
-            predsB[i] = 1.0
+            predsB[i] = 1
             dist[0] = 0.0
             dist[1] = 1.0
         else:
-            predsB[i] = 0.0
+            predsB[i] = 0
             dist[0] = 1.0
             dist[1] = 0.0
-    aucArea = metrics.roc_auc_score(realsB, predsB)
-    return aucArea
+    # print reals
+    # print preds
+    # print realsB
+    # print predsB
+    count = np.bincount(realsB)
+    if len(count) == 1 or count[0] == 0:
+        aucArea = 1
+    else:
+        aucArea = metrics.roc_auc_score(realsB, predsB)
 
+    return aucArea
 
 def statAUC(n_class,y_test,y_pred_test):
 

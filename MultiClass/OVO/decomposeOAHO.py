@@ -27,6 +27,11 @@ def decomposeOAHO(data,n_col,n_class):
         else:
             temp = np.append(ovo_class[index[i] - 1], ovo_class[index[i+1] - 1], axis=0)
             decompose_class.append(temp)
+    order_label=[]
+    for i in range(len(decompose_class)):
+        order_label.append(decompose_class[i][0][label_index])
+    order_label.append(decompose_class[-1][-1][-1])
+    return decompose_class,order_label
 
     # for i in decompose_class:
     #     print len(i)

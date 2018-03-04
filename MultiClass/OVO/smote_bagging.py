@@ -1,113 +1,97 @@
+# -*- coding: UTF-8 -*-
 from brew.generation import SmoteBagging
 from decomposeOVO import decomposeOVO
 import numpy as np
 from sklearn import metrics
 from sklearn import tree
 from statAUC import statAUC
-data = np.loadtxt('dataset/contraceptive-5-5tra.dat', dtype=float,delimiter=', ')
-testData=np.loadtxt('dataset/contraceptive-5-5tst.dat',dtype=float,delimiter=', ')
-# testSingleClass = decomposeOVO(testData,10,3)
-tra_single_class = decomposeOVO(data,10,3)
-x_tst, y_tst = np.split(testData, (9,), axis=1)
+from sklearn.model_selection import KFold
+from decomposeOVO import changeClassLabel
 
-# connect each single class by two as binary
-binary_class_list=[]
-y_train=[]
-for i in range(len(tra_single_class)):
-    for j in range(len(tra_single_class)):
-        if(j>i):
-            temp = np.empty(shape=[0, 9])
-            temp = np.append(tra_single_class[i], tra_single_class[j], axis=0)
-            binary_class_list.append(temp)
-            tempy1 = 0 * np.ones((len(tra_single_class[i]),), dtype='int64')
-            tempy2 = 1 * np.ones((len(tra_single_class[j]),), dtype='int64')
-            y_train.append(np.concatenate((tempy1, tempy2)))
-# testBinClass = []
-# for i in range(len(testSingleClass)):
-#     for j in range(len(testSingleClass)):
-#         if(j>i):
-#             temp = np.empty(shape=[0, 9])
-#             temp = np.append(testSingleClass[i], testSingleClass[j], axis=0)
-#             testBinClass.append(temp)
-x_train=[]
-#x_test=[]
-#y_test= []
-for i in range(len(binary_class_list)):
-    x, yi = np.split(binary_class_list[i], (9,), axis=1)
-    x_train.append(x)
-    # x_tst, y_tst = np.split(testBinClass[i], (9,), axis=1)
-    # x_test.append(x_tst)
-    # y_test.append(y_tst)
-# for i in range(0,3):
-#     print x_train[i].shape
-#     print y[i]
-#     print x_test[i].shape
-#     print y_test[i].shape
-#     print
+# @artical:Combining One-vs-One Decomposition and Ensemble Learning for Multi-class Imbalanced Data
+# @param trainSet:
+# @param testSet:
+# @param n_class: class num
+# @param n_attr:attribute num
+# @return metrics of MAUC
+def smoteBaggingClassifier(trainSet,testSet,n_class,n_attr):
+    # data = np.loadtxt('dataset/contraceptive-5-5tra.dat', dtype=float, delimiter=', ')
+    # testData = np.loadtxt('dataset/contraceptive-5-5tst.dat', dtype=float, delimiter=', ')
+    # testSingleClass = decomposeOVO(testData,10,3)
+    tra_single_class = decomposeOVO(trainSet, n_attr+1, n_class)
+    x_tst, y_tst = np.split(testSet, (n_attr,), axis=1)
 
+    # connect each single class by two as binary
+    binary_class_list = []
+    y_train = []
+    for i in range(len(tra_single_class)):
+        for j in range(len(tra_single_class)):
+            if (j > i):
+                temp = np.empty(shape=[0, n_attr])
+                temp = np.append(tra_single_class[i], tra_single_class[j], axis=0)
+                binary_class_list.append(temp)
+                tempy1 = 0 * np.ones((len(tra_single_class[i]),), dtype='int64')
+                tempy2 = 1 * np.ones((len(tra_single_class[j]),), dtype='int64')
+                y_train.append(np.concatenate((tempy1, tempy2)))
+    # testBinClass = []
+    # for i in range(len(testSingleClass)):
+    #     for j in range(len(testSingleClass)):
+    #         if(j>i):
+    #             temp = np.empty(shape=[0, 9])
+    #             temp = np.append(testSingleClass[i], testSingleClass[j], axis=0)
+    #             testBinClass.append(temp)
+    x_train = []
+    # x_test=[]
+    # y_test= []
+    for i in range(len(binary_class_list)):
+        x, yi = np.split(binary_class_list[i], (n_attr,), axis=1)
+        x_train.append(x)
+        # x_tst, y_tst = np.split(testBinClass[i], (9,), axis=1)
+        # x_test.append(x_tst)
+        # y_test.append(y_tst)
+    ctree = tree.DecisionTreeClassifier()
+    pool = []
+    y_pred_test = []
 
-# x1,yi1 = np.split(binary_class_list[0] , (9,), axis=1 )
-# x1_test,y1_test=np.split(testBinClass[0], (9,), axis=1)
-#
-# x2,yi2 = np.split(binary_class_list[1],(9,), axis=1)
-# x2_test, y2_test = np.split(testBinClass[1], (9,), axis=1)
+    for i in range(len(binary_class_list)):
+        temp_pool = SmoteBagging(base_classifier=ctree, n_classifiers=40, k=5)
+        pool.append(temp_pool)
+        # print x_train[i]
+        # print y_train[i]
+        pool[i].fit(x_train[i], y_train[i])
+        y_pred_test.append(pool[i].predict(x_tst))
+    y_test_temp = changeClassLabel(y_pred_test)
+    y_pred_final = []
+    for i in y_test_temp:
+        count = np.bincount(i)
+        y_pred_final.append(count.argmax())
+    # print y_pred_final
+    # print metrics.accuracy_score(y_tst, y_pred_final)
+    # print metrics.roc_auc_score(y_tst, y_pred_final)
+    # print metrics.f1_score(y_tst, y_pred_final, average='macro')
+    y_test = []
+    for i in range(len(y_tst)):
+        y_test.append(int(y_tst[i][0]))
+    # print statAUC(3, y_test, y_pred_final)
+    print y_pred_final
+    print y_test
+    mauc = statAUC(3, y_test, y_pred_final)
+    return mauc
 
-# print x1.shape
-# print x1_test.shape
-
-# leny1 = len(tra_single_class[0])
-# leny2 = len(tra_single_class[1])
-# tempy1 = 0 * np.ones((leny1,), dtype='int64')
-# tempy2 = 1 * np.ones((leny2,), dtype='int64')
-# y1 = np.concatenate((tempy1,tempy2))
-ctree = tree.DecisionTreeClassifier()
-pool = []
-y_pred_test = []
-
-# pool1 = SmoteBagging(base_classifier=ctree, n_classifiers=40, k=5)
-# pool2 = SmoteBagging(base_classifier=ctree, n_classifiers=40, k=5)
-# pool3 = SmoteBagging(base_classifier=ctree, n_classifiers=40, k=5)
-#
-# pool1.fit(x_train[0],y_train[0])
-# pool2.fit(x_train[1],y_train[1])
-# pool3.fit(x_train[2],y_train[2])
-#
-# y_pred_test.append(pool1.predict(x_tst))
-# y_pred_test.append(pool2.predict(x_tst))
-# y_pred_test.append(pool3.predict(x_tst))
-for i in range(len(binary_class_list)):
-    temp_pool = SmoteBagging(base_classifier=ctree, n_classifiers=40, k=5)
-    pool.append(temp_pool)
-    pool[i].fit(x_train[i],y_train[i])
-    y_pred_test.append(pool[i].predict(x_tst))
-y_test_temp= [([0] * len(y_pred_test)) for i in range(len(y_pred_test[0]))]
-for i in range(len(y_pred_test)):
-    for j in range(len(y_pred_test[i])):
-        if(i==0):
-            if(y_pred_test[i][j]==0):
-                y_pred_test[i][j] = 1
-            else:
-                y_pred_test[i][j] = 2
-        if(i == 1):
-            if (y_pred_test[i][j] == 0):
-                y_pred_test[i][j] = 1
-            else:
-                y_pred_test[i][j] = 3
-        if(i == 2):
-            if (y_pred_test[i][j] == 0):
-                y_pred_test[i][j] = 2
-            else:
-                y_pred_test[i][j] = 3
-        y_test_temp[j][i] = y_pred_test[i][j]
-y_pred_final=[]
-for i in y_test_temp:
-    count = np.bincount(i)
-    y_pred_final.append(count.argmax())
-#print y_pred_final
-print metrics.accuracy_score(y_tst,y_pred_final)
-#print metrics.roc_auc_score(y_tst, y_pred_final)
-print metrics.f1_score(y_tst, y_pred_final, average='macro')
-y_test=[]
-for i in range(len(y_tst)):
-    y_test.append(int(y_tst[i][0]))
-print statAUC(3,y_test,y_pred_final)
+# data = np.loadtxt('dataset/yeast.data', dtype=str, delimiter='  ')
+# id,tmp = np.split(data,(1,),axis=1)
+# print tmp
+# dat = tmp[0:,0:].astype(float)
+# x,y = np.split(dat, (8,), axis=1)
+# kf=KFold(n_splits=10,shuffle=True)    #分成几个组
+# kf.get_n_splits()
+# print(kf)
+# total = 0
+# for i_train,i_test in kf.split(x,y):
+#     x_train,x_test = x[i_train],x[i_test]
+#     y_train, y_test = y[i_train], y[i_test]
+#     trainSet = np.append(x_train,y_train,axis=1)
+#     testSet = np.append(x_test,y_test,axis=1)
+#     total += smoteBaggingClassifier(trainSet, testSet, 10, 8)
+#     print '================================================'
+# print total/10
